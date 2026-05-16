@@ -9,7 +9,7 @@
     const connectToTopic = () => {
         if(socket) socket.close();
         messages = [];
-        socket = new WebSocket('ws://localhost:8000/ws/technology');
+        socket = new WebSocket(`wss://${PUBLIC_BASEURL_PROD}/ws/technology`);
 
         socket.onmessage = (event) => {
             messages = [...messages, event.data];
