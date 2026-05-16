@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onDestroy } from 'svelte';
-    import { PUBLIC_BASEURL_LOCAL } from '$env/static/public';
+    import { PUBLIC_BASEURL_PROD } from '$env/static/public';
 
     let socket: WebSocket;
     let messages: string[] = $state([]);
