@@ -1,5 +1,6 @@
 <script lang="ts">
-    import { onDestroy } from 'svelte';
+    import { onMount, onDestroy } from 'svelte';
+    import { browser } from '$app/environment';
     import { PUBLIC_BASEURL_PROD } from '$env/static/public';
 
     let socket: WebSocket;
@@ -14,6 +15,15 @@
         socket.onmessage = (event) => {
             messages = [...messages, event.data];
         };
+
+        socket.onclose = () => {
+            console.log('WebSocket connection closed');
+        };
+
+        socket.onerror = (error) => {
+            console.error('WebSocket error:', error);
+        };
+
     }
 
     const publishMessage = () => {
@@ -24,10 +34,25 @@
         }
     }
 
-    connectToTopic();
+    const reconnect = () => {
+    if (!socket || socket.readyState === WebSocket.CLOSED) {
+        connectToTopic();
+    }
+};
+
+    onMount(() => {
+        if(!browser) return;
+        connectToTopic();
+        messages = [];
+        window.addEventListener('online', reconnect);
+        window.addEventListener('focus', reconnect);
+    });
 
     onDestroy(() => {
+        if(!browser) return;
         if(socket) socket.close();
+        window.removeEventListener('online', reconnect);
+        window.removeEventListener('focus', reconnect);
     });
 </script>
 
