@@ -35,10 +35,10 @@
     }
 
     const reconnect = () => {
-    if (!socket || socket.readyState === WebSocket.CLOSED) {
-        connectToTopic();
-    }
-};
+        if (!socket || socket.readyState === WebSocket.CLOSED) {
+            connectToTopic();
+        }
+    };
 
     onMount(() => {
         if(!browser) return;
