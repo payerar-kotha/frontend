@@ -4,6 +4,7 @@
 
     import { PUBLIC_BASEURL_PROD } from '$env/static/public';
     import Modal from "../components/Modal.svelte";
+    import MessageBox from "./messageBox.svelte";
 
     let isActiveInChannel = $state(false);
     let createChannelModalShow = $state(false);
@@ -14,7 +15,7 @@
     let id = '';
 
     let socket: WebSocket;
-    let messages: string[] = $state([]);
+    let messages: { message: string; sender: string; id: string; timestamp: string }[] = $state([]);
     let msg = $state('');
 
     const createChannelModalClosedCB = () => {
@@ -26,29 +27,50 @@
     }
 
     const createChannel = () => {
-        connectToTopic();
+        connectToTopic('create');
         createChannelModalShow = false;
+        channelName = '';
+        passcode = '';
+        name = '';
     }
 
     const joinChannel = () => {
-        connectToTopic();
+        connectToTopic('join');
         joinChannelModalShow = false;
+        channelName = '';
+        passcode = '';
+        name = '';
     }
 
-    const connectToTopic = () => {
-        isActiveInChannel = true;
+    const connectToTopic = (mode: 'create' | 'join') => {
         if(socket) socket.close();
         messages = [];
-        socket = new WebSocket(`wss://${PUBLIC_BASEURL_PROD}/join-channel/${channelName}?passcode=${passcode}&name=${name}&id=${id}`);
+        socket = new WebSocket(`wss://${PUBLIC_BASEURL_PROD}/${mode}-channel/${channelName}?passcode=${passcode}&name=${name}&id=${id}`);
 
         socket.onmessage = (event) => {
-            messages = [...messages, event.data];
+            const parsedData = JSON.parse(event.data);
+            if(parsedData.type == "INIT__TYPE") {
+                const {payload} = parsedData;
+                id = payload.id;
+                channelName = payload.topic;
+                passcode = payload.passcode;
+                name = payload.name;
+                localStorage.setItem('id', id);
+                localStorage.setItem('topic', channelName);
+                localStorage.setItem('passcode', passcode);
+                localStorage.setItem('name', name);
+                isActiveInChannel = true;
+                return;
+            }
+            else if(parsedData.type == "MESSAGE__TEMP") {
+                const {payload} = parsedData;
+                messages = [...messages, payload];
+            }
         };
 
         socket.onclose = (e) => {
             console.log('WebSocket connection closed', e);
             if(e.code == 1008) {
-                console.error(e.reason);
                 localStorage.clear();
                 isActiveInChannel = false;
             }
@@ -63,7 +85,12 @@
     const publishMessage = () => {
         msg = msg.trim();
         if(socket && socket.readyState === WebSocket.OPEN) {
-            socket.send(msg);
+            socket.send(JSON.stringify({type: "MESSAGE__TEMP", payload: {
+                message: msg,
+                sender: name || 'Anonymous',
+                id,
+                timestamp: new Date().toISOString()
+            }}));
             msg = '';
         }
     }
@@ -74,19 +101,22 @@
             if(!passcode) passcode = localStorage.getItem('passcode') || '';
             if(!name) name = localStorage.getItem('name') || '';
             if(!id) id = localStorage.getItem('id') || '';
-            connectToTopic();
+            connectToTopic('join');
         }
     };
 
     onMount(() => {
         if(!browser) return;
-        if(!isActiveInChannel) return;
         if(!localStorage.getItem('topic') || !localStorage.getItem('passcode')){
             localStorage.clear();
             isActiveInChannel = false;
             return;
         }
-        connectToTopic();
+        if(!channelName) channelName = localStorage.getItem('topic') || '';
+        if(!passcode) passcode = localStorage.getItem('passcode') || '';
+        if(!name) name = localStorage.getItem('name') || '';
+        if(!id) id = localStorage.getItem('id') || '';
+        connectToTopic('join');
         messages = [];
         window.addEventListener('online', reconnect);
         window.addEventListener('focus', reconnect);
@@ -128,7 +158,12 @@
     {/if}
 {:else}
     <div style="background-color: lightgray; padding: 20px;">
-        typing...
+        <div style="float: left;">typing...</div>
+        <button style="float: right;" onclick={() => {
+            if(socket) socket.close();
+            localStorage.clear();
+            isActiveInChannel = false;
+        }}>Leave Channel</button>
     </div>
     <div>
         <input type="text" bind:value={msg} placeholder="Type something..." />
@@ -136,11 +171,11 @@
 
         <div>
             <h4>Messages:</h4>
-            <ul>
+            <div style="width: 100%; display: flex; flex-direction: column; gap: 10px;">
                 {#each messages as message}
-                    <li>{message}</li>
+                    <MessageBox {...message} />
                 {/each}
-            </ul>
+            </div>
         </div>
     </div>
 {/if}
