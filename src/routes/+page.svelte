@@ -1,12 +1,11 @@
 <script lang="ts">
     import { onMount, onDestroy } from 'svelte';
-    import { browser } from '$app/environment';
 
     import { PUBLIC_BASEURL_PROD } from '$env/static/public';
     import Modal from "../components/Modal.svelte";
     import MessageBox from "./messageBox.svelte";
 
-    let isActiveInChannel = $state(false);
+    let isActiveInChannel = $state(!!(localStorage.getItem('topic') && localStorage.getItem('passcode')));
     let createChannelModalShow = $state(false);
     let joinChannelModalShow = $state(false);
     let channelName = $state('');
@@ -15,7 +14,7 @@
     let id = '';
 
     let socket: WebSocket;
-    let messages: { message: string; sender: string; id: string; timestamp: string }[] = $state([]);
+    let messages: { message: string; sender: string; id: string; timestamp: number }[] = $state([]);
     let msg = $state('');
 
     const createChannelModalClosedCB = () => {
@@ -27,6 +26,14 @@
     }
 
     const createChannel = () => {
+        if(channelName != channelName.trim()) {
+            alert('Channel name cannot have leading or trailing spaces.');
+            return;
+        }
+        if(!channelName || !passcode) {
+            alert('Channel name and passcode are required to create a channel.');
+            return;
+        }
         connectToTopic('create');
         createChannelModalShow = false;
         channelName = '';
@@ -70,7 +77,8 @@
 
         socket.onclose = (e) => {
             console.log('WebSocket connection closed', e);
-            if(e.code == 1008) {
+            if(e.code == 4001) {
+                alert(e.reason);
                 localStorage.clear();
                 isActiveInChannel = false;
             }
@@ -89,7 +97,7 @@
                 message: msg,
                 sender: name || 'Anonymous',
                 id,
-                timestamp: new Date().toISOString()
+                timestamp: Date.now()
             }}));
             msg = '';
         }
@@ -106,7 +114,6 @@
     };
 
     onMount(() => {
-        if(!browser) return;
         if(!localStorage.getItem('topic') || !localStorage.getItem('passcode')){
             localStorage.clear();
             isActiveInChannel = false;
@@ -123,7 +130,6 @@
     });
 
     onDestroy(() => {
-        if(!browser) return;
         if(socket) socket.close();
         window.removeEventListener('online', reconnect);
         window.removeEventListener('focus', reconnect);
@@ -141,7 +147,7 @@
         <Modal onClose={() => createChannelModalClosedCB()} >
             <h2>Create New Anonymous Channel</h2>
             <input type="text" placeholder="Channel Name" bind:value={channelName} />
-            <input type="text" placeholder="Passcode (optional)" bind:value={passcode} />
+            <input type="text" placeholder="Passcode" bind:value={passcode} />
             <input type="text" placeholder="Your Name (optional)" bind:value={name} />
             <button onclick={() => createChannel()}>Create Channel</button>
         </Modal>
@@ -157,25 +163,25 @@
         </Modal>
     {/if}
 {:else}
-    <div style="background-color: lightgray; padding: 20px;">
-        <div style="float: left;">typing...</div>
-        <button style="float: right;" onclick={() => {
+    <div style="background-color: lightgray; padding: 20px; display: flex; justify-content: space-between; align-items: center;">
+        <div>Channel Name: {channelName}</div>
+        <button onclick={() => {
             if(socket) socket.close();
             localStorage.clear();
             isActiveInChannel = false;
         }}>Leave Channel</button>
     </div>
-    <div>
-        <input type="text" bind:value={msg} placeholder="Type something..." />
+    <div class="scrollable" style="height: calc(100vh - 102.2px); padding: 20px; display: flex; flex-direction: column; gap: 10px;">
+        {#each messages as message}
+            <MessageBox {...message} />
+        {/each}
+    </div>
+    <div style="background-color: #bbb; padding: 10px; display: flex; justify-content: space-between; align-items: center;">
+        <input type="text" bind:value={msg} placeholder="Type something..." onkeyup={e => {
+            if(e.key === 'Enter') {
+                publishMessage();
+            }
+        }} />
         <button onclick={publishMessage}>Submit</button>
-
-        <div>
-            <h4>Messages:</h4>
-            <div style="width: 100%; display: flex; flex-direction: column; gap: 10px;">
-                {#each messages as message}
-                    <MessageBox {...message} />
-                {/each}
-            </div>
-        </div>
     </div>
 {/if}

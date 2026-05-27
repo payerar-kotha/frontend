@@ -2,9 +2,44 @@
 <html lang="en">
 	<head>
 		<style>
+			.scrollable {
+				overflow-y: auto;
+				
+				scrollbar-gutter: stable; /* Prevents layout shifts when scrollbar appears */
+				scrollbar-width: thin;
+				/* First value is thumb, second value is track. Track MUST be transparent. */
+				scrollbar-color: rgba(136, 136, 136, 0.5) transparent;
+			}
+
+			/* WebKit Engines (Chrome, Safari, Edge, Opera) */
+			.scrollable::-webkit-scrollbar {
+				width: 8px;              /* Total physical width of the scrollbar space */
+				background: transparent;  /* Forces the track container to be invisible */
+			}
+
+			.scrollable::-webkit-scrollbar-track {
+				background: transparent;  /* Ensures no background blocks your content */
+			}
+
+			.scrollable::-webkit-scrollbar-thumb {
+			/* Semi-transparent thumb so your text/content is visible underneath it */
+				background-color: rgba(136, 136, 136, 0.5); 
+				border-radius: 10px;
+				
+				/* Creates an optional floating padding effect inside the 8px zone */
+				border: 2px solid transparent;
+				background-clip: content-box;
+			}
+
+			.scrollable::-webkit-scrollbar-thumb:hover {
+				background-color: rgba(136, 136, 136, 0.8); /* Darkens slightly on hover */
+			}
 			button {
 				display: block;
 				cursor: pointer;
+			}
+			div {
+				box-sizing: border-box;
 			}
 		</style>
 		<meta charset="utf-8" />
